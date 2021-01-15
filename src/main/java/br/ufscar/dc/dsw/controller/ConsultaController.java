@@ -19,10 +19,14 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import br.ufscar.dc.dsw.domain.Paciente;
 import br.ufscar.dc.dsw.domain.Consulta;
+import br.ufscar.dc.dsw.domain.Medico;
+import br.ufscar.dc.dsw.domain.Usuario;
 import br.ufscar.dc.dsw.security.UsuarioDetails;
 import br.ufscar.dc.dsw.service.spec.IPacienteService;
 import br.ufscar.dc.dsw.service.spec.IConsultaService;
 import br.ufscar.dc.dsw.service.spec.IMedicoService;
+import br.ufscar.dc.dsw.service.spec.IUsuarioService;
+import java.util.ArrayList;
 
 @Controller
 @RequestMapping("/consultas")
@@ -32,6 +36,9 @@ public class ConsultaController {
 	
 	@Autowired
 	private IPacienteService pacienteService;
+        
+	@Autowired
+	private IUsuarioService usuarioService;
 	
 	@Autowired
 	private IMedicoService medicoService;
@@ -41,6 +48,19 @@ public class ConsultaController {
 		UsuarioDetails user = (UsuarioDetails)authentication.getPrincipal();
 		return pacienteService.buscarPorId(user.getId());
 	}
+        
+        private Medico getMedicoAutenticado() {
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+		UsuarioDetails user = (UsuarioDetails)authentication.getPrincipal();
+		return medicoService.buscarPorId(user.getId());
+	}
+        
+        private String getUserRole(){
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+		UsuarioDetails user = (UsuarioDetails)authentication.getPrincipal();
+                Usuario usuario = usuarioService.buscarPorId(user.getId());
+		return usuario.getRole();
+        }
 	
 	private boolean verificaDataHoraOcupada(Consulta consulta) {
 		List<Consulta> consultas = consultaService.buscarPorMedico(consulta.getMedico());
@@ -63,7 +83,17 @@ public class ConsultaController {
 
 	@GetMapping("/listar")
 	public String listar(@RequestParam(required = false) String c, ModelMap model) {
-		List<Consulta> consultas = consultaService.buscarPorPaciente(getPacienteAutenticado());
+                List<Consulta> consultas = new ArrayList<Consulta>();
+                
+                if(getUserRole().equals("ROLE_ADMIN")){
+                    consultas = consultaService.buscarTodos();
+                }
+                else if(getUserRole().equals("ROLE_MEDICO")){
+                    consultas = consultaService.buscarPorMedico(getMedicoAutenticado());
+                }
+                else if(getUserRole().equals("ROLE_PACIENTE")){
+                    consultas = consultaService.buscarPorPaciente(getPacienteAutenticado());
+                }
 
 		model.addAttribute("consultas", consultas);
 		return "consulta/lista";
